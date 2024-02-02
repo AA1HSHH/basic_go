@@ -1,7 +1,11 @@
 package web
 
 import (
+	"basic-go/webook/internal/domain"
+	"basic-go/webook/internal/service"
+	"errors"
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -14,12 +18,14 @@ const (
 type UserHandler struct {
 	emailRexExp    *regexp.Regexp
 	passwordRexExp *regexp.Regexp
+	svc            *service.UserService
 }
 
-func NewUserHandler() *UserHandler {
+func NewUserHandler(svc *service.UserService) *UserHandler {
 	return &UserHandler{
 		emailRexExp:    regexp.MustCompile(emailRegexPattern, regexp.None),
 		passwordRexExp: regexp.MustCompile(passwordRegexPattern, regexp.None),
+		svc:            svc,
 	}
 }
 func (u *UserHandler) RegisterRouters(server *gin.Engine) {
@@ -62,11 +68,51 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "密码太简单，需要数字、字母和特殊字符，并且总长度要大于8")
 		return
 	}
-	//log.Println(req)
-	ctx.String(http.StatusOK, "注册成功")
+
+	err = u.svc.Signup(ctx, domain.User{
+		Email:    req.Email,
+		Password: req.Password,
+	})
+	switch {
+	case errors.Is(err, service.ErrUserDuplicateEmail):
+		ctx.String(http.StatusOK, "邮箱重复")
+	case err == nil:
+		ctx.String(http.StatusOK, "注册成功")
+	default:
+		ctx.String(http.StatusOK, "系统错误")
+	}
+
 }
 
-func (u *UserHandler) LogIn(ctx *gin.Context) {
+func (h *UserHandler) LogIn(ctx *gin.Context) {
+	type Req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
+	user, err := h.svc.Login(ctx, req.Email, req.Password)
+
+	switch err {
+	case service.ErrInvalidUserOrPassword:
+		ctx.String(http.StatusOK, "用户名或密码不对")
+	case nil:
+
+		sess := sessions.Default(ctx)
+		sess.Set("userId", user.Id)
+		sess.Options(sessions.Options{MaxAge: 900})
+		err = sess.Save()
+		if err != nil {
+			ctx.String(http.StatusOK, "服务器异常")
+			return
+		}
+
+		ctx.String(http.StatusOK, "登录成功")
+	default:
+		ctx.String(http.StatusOK, "系统错误")
+	}
 
 }
 
@@ -74,5 +120,5 @@ func (u *UserHandler) Edit(ctx *gin.Context) {
 
 }
 func (u *UserHandler) Profile(ctx *gin.Context) {
-
+	ctx.String(http.StatusOK, "ok")
 }
