@@ -5,6 +5,7 @@ import (
 	"basic-go/webook/internal/repository"
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -15,6 +16,7 @@ type UserService struct {
 var (
 	ErrUserDuplicateEmail    = repository.ErrUserDuplicateEmail
 	ErrInvalidUserOrPassword = errors.New("用户或密码错误")
+	ErrUserNotFound          = repository.ErrUserNotFound
 )
 
 func NewUserService(repo *repository.UserRepository) *UserService {
@@ -42,4 +44,19 @@ func (svc *UserService) Login(ctx context.Context, email string, password string
 		return domain.User{}, ErrInvalidUserOrPassword
 	}
 	return u, nil
+}
+
+func (svc *UserService) Edit(ctx context.Context, id int64, me string, birthday string, nickname string) error {
+	return svc.repo.AddInfo(ctx, id, me, birthday, nickname)
+}
+
+func (svc *UserService) Profile(ctx *gin.Context, userId int64) (domain.User, error) {
+	u, err := svc.repo.FindById(ctx, userId)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		return domain.User{}, ErrUserNotFound
+	}
+	if err != nil {
+		return domain.User{}, err
+	}
+	return u, err
 }

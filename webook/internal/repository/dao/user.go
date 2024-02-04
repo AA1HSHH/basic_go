@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
+	"log"
 	"time"
 )
 
@@ -40,6 +41,18 @@ func (dao *UserDao) FindByEmail(ctx context.Context, email string) (User, error)
 	err := dao.db.WithContext(ctx).Where("email=?", email).First(&u).Error
 	return u, err
 }
+func (dao *UserDao) FindById(ctx context.Context, id int64) (User, error) {
+	var u User
+	err := dao.db.WithContext(ctx).Where("id=?", id).First(&u).Error
+	return u, err
+}
+
+func (dao *UserDao) AddInfo(ctx context.Context, id int64, me string, birthday string, nickname string) error {
+	log.Println("AddInfo")
+	err := dao.db.WithContext(ctx).Table("users").Where("id=?", id).
+		Updates(map[string]interface{}{"nickname": nickname, "birthday": birthday, "about_me": me}).Error
+	return err
+}
 
 type User struct {
 	Id       int64  `gorm:"primaryKey,autoIncrement"`
@@ -47,4 +60,7 @@ type User struct {
 	Password string
 	Ctime    int64
 	Utime    int64
+	Nickname string
+	Birthday string
+	AboutMe  string
 }

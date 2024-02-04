@@ -4,6 +4,7 @@ import (
 	"basic-go/webook/internal/domain"
 	"basic-go/webook/internal/repository/dao"
 	"context"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -38,5 +39,20 @@ func (repo *UserRepository) toDomain(user dao.User) domain.User {
 		Id:       user.Id,
 		Email:    user.Email,
 		Password: user.Password,
+		Nickname: user.Nickname,
+		Birthday: user.Birthday,
+		AboutMe:  user.AboutMe,
 	}
+}
+
+func (repo *UserRepository) AddInfo(ctx context.Context, id int64, me string, birthday string, nickname string) error {
+	return repo.dao.AddInfo(ctx, id, me, birthday, nickname)
+}
+
+func (repo *UserRepository) FindById(ctx *gin.Context, id int64) (domain.User, error) {
+	u, err := repo.dao.FindById(ctx, id)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return repo.toDomain(u), nil
 }

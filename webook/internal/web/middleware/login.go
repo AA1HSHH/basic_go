@@ -17,7 +17,6 @@ func (*LoginMiddlewareBuilder) CheckLogin() gin.HandlerFunc {
 		}
 
 		sess := sessions.Default(context)
-
 		if sess.Get("userId") == nil {
 			context.AbortWithStatus(http.StatusUnauthorized)
 			return

@@ -12,10 +12,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+	"log"
 	"time"
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	db := initDB()
 	server := initWebServer()
 	initUser(server, db)
@@ -24,7 +27,9 @@ func main() {
 
 func initDB() *gorm.DB {
 	dsn := "root:root@tcp(43.142.48.34:13316)/webook?charset=utf8mb4&parseTime=True&loc=Local"
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 	if err != nil {
 		panic(err)
 	}
