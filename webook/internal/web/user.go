@@ -8,11 +8,14 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"time"
+	"unicode/utf8"
 )
 
 const (
 	emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+	timeFormat           = "2006-01-02"
 )
 
 type UserHandler struct {
@@ -35,7 +38,7 @@ func (u *UserHandler) RegisterRouters(server *gin.Engine) {
 	server.GET("/users/profile", u.Profile)
 }
 
-func (u *UserHandler) SignUp(ctx *gin.Context) {
+func (h *UserHandler) SignUp(ctx *gin.Context) {
 
 	type SignUpReq struct {
 		Email           string `json:"email"`
@@ -46,7 +49,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 	if err := ctx.Bind(&req); err != nil {
 		return
 	}
-	isEmail, err := u.emailRexExp.MatchString(req.Email)
+	isEmail, err := h.emailRexExp.MatchString(req.Email)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
@@ -59,7 +62,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "两次密码不相同")
 		return
 	}
-	isPasswd, err := u.passwordRexExp.MatchString(req.Password)
+	isPasswd, err := h.passwordRexExp.MatchString(req.Password)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
@@ -69,7 +72,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context) {
 		return
 	}
 
-	err = u.svc.Signup(ctx, domain.User{
+	err = h.svc.Signup(ctx, domain.User{
 		Email:    req.Email,
 		Password: req.Password,
 	})
@@ -116,9 +119,88 @@ func (h *UserHandler) LogIn(ctx *gin.Context) {
 
 }
 
-func (u *UserHandler) Edit(ctx *gin.Context) {
+func (h *UserHandler) Edit(ctx *gin.Context) {
+	type Req struct {
+		AboutMe  string `json:"aboutMe"`
+		Birthday string `json:"birthday"`
+		Nickname string `json:"nickname"`
+	}
+	var req Req
+	if err := ctx.Bind(&req); err != nil {
+		return
+	}
 
+	// 字段必须大写
+	type Res struct {
+		Code int64  `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	birthday, err := time.Parse(timeFormat, req.Birthday)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Res{
+			Code: 1,
+			Msg:  "时间格式错误",
+		})
+		return
+	}
+	if utf8.RuneCountInString(req.Nickname) >= 15 {
+		ctx.JSON(http.StatusOK, Res{
+			Code: 1,
+			Msg:  "昵称过长，需要少于16个中英文字符",
+		})
+		return
+	}
+	if utf8.RuneCountInString(req.AboutMe) >= 25 {
+		ctx.JSON(http.StatusOK, Res{
+			Code: 1,
+			Msg:  "简介过长，需要少于26个中英文字符",
+		})
+		return
+	}
+	sess := sessions.Default(ctx)
+	userId := sess.Get("userId")
+
+	if err := h.svc.Edit(ctx, domain.User{
+		Id:       userId.(int64),
+		Nickname: req.Nickname,
+		Birthday: birthday,
+		AboutMe:  req.AboutMe,
+	}); err != nil {
+		ctx.JSON(http.StatusOK, Res{
+			Code: 1,
+			Msg:  "系统错误",
+		})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, Res{
+		Code: 0,
+		Msg:  "更新成功",
+	})
 }
-func (u *UserHandler) Profile(ctx *gin.Context) {
-	ctx.String(http.StatusOK, "ok")
+func (h *UserHandler) Profile(ctx *gin.Context) {
+
+	sess := sessions.Default(ctx)
+	userId := sess.Get("userId")
+	u, err := h.svc.Profile(ctx, userId.(int64))
+	// 字段必须大写
+
+	type Res struct {
+		Id       int64
+		Email    string
+		Nickname string
+		Birthday string
+		AboutMe  string
+	}
+	switch err {
+	case service.ErrUserNotFound:
+		ctx.String(http.StatusOK, "用户不存在")
+	case nil:
+		ctx.JSON(http.StatusOK, Res{Id: u.Id, Email: u.Email,
+			Nickname: u.Nickname, Birthday: u.Birthday.Format(timeFormat), AboutMe: u.AboutMe})
+	default:
+		ctx.String(http.StatusOK, "系统错误")
+
+	}
+
 }

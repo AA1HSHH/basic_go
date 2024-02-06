@@ -1,0 +1,2 @@
+data:
+  sdn: "root:pass@tcp(ip:port)/db?charset=utf8mb4&parseTime=True&loc=Local"
