@@ -8,12 +8,14 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"time"
 	"unicode/utf8"
 )
 
 const (
 	emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 	passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&])[A-Za-z\d$@$!%*#?&]{8,}$`
+	timeFormat           = "2006-01-02"
 )
 
 type UserHandler struct {
@@ -133,16 +135,23 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 		Code int64  `json:"code"`
 		Msg  string `json:"msg"`
 	}
-
+	birthday, err := time.Parse(timeFormat, req.Birthday)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Res{
+			Code: 1,
+			Msg:  "时间格式错误",
+		})
+		return
+	}
 	if utf8.RuneCountInString(req.Nickname) >= 15 {
-		ctx.JSON(http.StatusForbidden, Res{
+		ctx.JSON(http.StatusOK, Res{
 			Code: 1,
 			Msg:  "昵称过长，需要少于16个中英文字符",
 		})
 		return
 	}
 	if utf8.RuneCountInString(req.AboutMe) >= 25 {
-		ctx.JSON(http.StatusForbidden, Res{
+		ctx.JSON(http.StatusOK, Res{
 			Code: 1,
 			Msg:  "简介过长，需要少于26个中英文字符",
 		})
@@ -151,7 +160,12 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
 	userId := sess.Get("userId")
 
-	if err := h.svc.Edit(ctx, userId.(int64), req.AboutMe, req.Birthday, req.Nickname); err != nil {
+	if err := h.svc.Edit(ctx, domain.User{
+		Id:       userId.(int64),
+		Nickname: req.Nickname,
+		Birthday: birthday,
+		AboutMe:  req.AboutMe,
+	}); err != nil {
 		ctx.JSON(http.StatusOK, Res{
 			Code: 1,
 			Msg:  "系统错误",
@@ -182,7 +196,8 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 	case service.ErrUserNotFound:
 		ctx.String(http.StatusOK, "用户不存在")
 	case nil:
-		ctx.JSON(http.StatusOK, Res{Id: u.Id, Email: u.Email, Nickname: u.Nickname, Birthday: u.Birthday, AboutMe: u.AboutMe})
+		ctx.JSON(http.StatusOK, Res{Id: u.Id, Email: u.Email,
+			Nickname: u.Nickname, Birthday: u.Birthday.Format(timeFormat), AboutMe: u.AboutMe})
 	default:
 		ctx.String(http.StatusOK, "系统错误")
 

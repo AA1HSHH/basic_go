@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
-	"log"
 	"time"
 )
 
@@ -47,10 +46,10 @@ func (dao *UserDao) FindById(ctx context.Context, id int64) (User, error) {
 	return u, err
 }
 
-func (dao *UserDao) AddInfo(ctx context.Context, id int64, me string, birthday string, nickname string) error {
-	log.Println("AddInfo")
-	err := dao.db.WithContext(ctx).Table("users").Where("id=?", id).
-		Updates(map[string]interface{}{"nickname": nickname, "birthday": birthday, "about_me": me}).Error
+func (dao *UserDao) UpdateInfo(ctx context.Context, u User) error {
+	err := dao.db.WithContext(ctx).Table("users").Where("id=?", u.Id).
+		Updates(map[string]interface{}{"nickname": u.Nickname, "birthday": u.Birthday,
+			"about_me": u.AboutMe, "ctime": time.Now().UnixMilli()}).Error
 	return err
 }
 
@@ -61,6 +60,6 @@ type User struct {
 	Ctime    int64
 	Utime    int64
 	Nickname string
-	Birthday string
+	Birthday int64
 	AboutMe  string
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -18,15 +19,23 @@ import (
 )
 
 func main() {
+	initConfig()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	db := initDB()
 	server := initWebServer()
 	initUser(server, db)
 	server.Run(":8080")
 }
-
+func initConfig() {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath("./webook/")
+	if err := viper.ReadInConfig(); err != nil {
+		panic(err)
+	}
+}
 func initDB() *gorm.DB {
-	dsn := "root:root@tcp(43.142.48.34:13316)/webook?charset=utf8mb4&parseTime=True&loc=Local"
+	dsn := viper.Sub("data").GetString("sdn")
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
